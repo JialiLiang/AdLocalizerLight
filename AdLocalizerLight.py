@@ -57,6 +57,9 @@ def get_secret(key):
 openai_api_key = get_secret("OPENAI_API_KEY")
 elevenlabs_api_key = get_secret("ELEVENLABS_API_KEY")
 
+# Debug: Print first few characters of API keys (safely)
+st.write("Debug: ElevenLabs API Key starts with:", elevenlabs_api_key[:10] + "..." if elevenlabs_api_key else "None")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -196,7 +199,7 @@ def generate_elevenlabs_voice(text, language_code, output_directory, english_ide
         headers = {
             "Accept": "audio/mpeg",
             "Content-Type": "application/json",
-            "xi-api-key": os.getenv("ELEVENLABS_API_KEY")
+            "xi-api-key": elevenlabs_api_key
         }
         
         data = {
@@ -215,7 +218,7 @@ def generate_elevenlabs_voice(text, language_code, output_directory, english_ide
                 f.write(response.content)
             return output_file
         else:
-            st.error(f"Error from ElevenLabs API: {response.status_code}")
+            st.error(f"Error from ElevenLabs API: {response.status_code} - {response.text}")
             return None
     except Exception as e:
         st.error(f"Error generating voice: {str(e)}")
