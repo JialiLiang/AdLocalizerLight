@@ -17,15 +17,19 @@ import logging
 import zipfile
 import io
 
-# Load environment variables
+# Load environment variables - try local .env first, then fall back to Streamlit secrets
 load_dotenv()
+
+# Get API keys from either .env or Streamlit secrets
+openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
+elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY") or st.secrets["ELEVENLABS_API_KEY"]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Initialize API clients
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-eleven_labs_client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+openai_client = OpenAI(api_key=openai_api_key)
+eleven_labs_client = ElevenLabs(api_key=elevenlabs_api_key)
 
 # Voice options
 VOICES = {
