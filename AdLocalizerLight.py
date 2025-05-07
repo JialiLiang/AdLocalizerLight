@@ -20,14 +20,20 @@ import io
 # Load environment variables - try local .env first, then fall back to Streamlit secrets
 load_dotenv()
 
+# Debug: Print all available secrets
+st.write("Debug: Available secrets:", st.secrets)
+
 # Get API keys from either .env or Streamlit secrets
 def get_secret(key):
     """Get secret from environment variable or Streamlit secrets"""
     value = os.getenv(key)
     if value:
+        st.write(f"Debug: Found {key} in environment variables")
         return value
     try:
-        return st.secrets[key]
+        value = st.secrets[key]
+        st.write(f"Debug: Found {key} in Streamlit secrets")
+        return value
     except KeyError:
         st.error(f"""
         ⚠️ Missing API Key: {key}
@@ -39,6 +45,10 @@ def get_secret(key):
         [secrets]
         {key} = "your_api_key"
         ```
+        
+        Debug Info:
+        - Available secrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else 'No secrets found'}
+        - Environment variable value: {os.getenv(key)}
         """)
         st.stop()
 
