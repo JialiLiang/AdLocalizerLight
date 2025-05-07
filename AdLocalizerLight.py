@@ -31,7 +31,8 @@ def get_secret(key):
         st.write(f"Debug: Found {key} in environment variables")
         return value
     try:
-        value = st.secrets[key]
+        # Try to get the secret from the nested structure
+        value = st.secrets["secrets"][key]
         st.write(f"Debug: Found {key} in Streamlit secrets")
         return value
     except KeyError:
@@ -47,7 +48,7 @@ def get_secret(key):
         ```
         
         Debug Info:
-        - Available secrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else 'No secrets found'}
+        - Available secrets: {list(st.secrets.get('secrets', {}).keys()) if hasattr(st.secrets, 'get') else 'No secrets found'}
         - Environment variable value: {os.getenv(key)}
         """)
         st.stop()
