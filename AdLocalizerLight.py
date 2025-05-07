@@ -21,8 +21,30 @@ import io
 load_dotenv()
 
 # Get API keys from either .env or Streamlit secrets
-openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
-elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY") or st.secrets["ELEVENLABS_API_KEY"]
+def get_secret(key):
+    """Get secret from environment variable or Streamlit secrets"""
+    value = os.getenv(key)
+    if value:
+        return value
+    try:
+        return st.secrets[key]
+    except KeyError:
+        st.error(f"""
+        ⚠️ Missing API Key: {key}
+        
+        Please add your API key in one of these ways:
+        1. Create a .env file locally with {key}=your_api_key
+        2. Add it to Streamlit Cloud secrets in the format:
+        ```toml
+        [secrets]
+        {key} = "your_api_key"
+        ```
+        """)
+        st.stop()
+
+# Get API keys
+openai_api_key = get_secret("OPENAI_API_KEY")
+elevenlabs_api_key = get_secret("ELEVENLABS_API_KEY")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
