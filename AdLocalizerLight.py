@@ -16,6 +16,7 @@ from elevenlabs.client import ElevenLabs
 import logging
 import zipfile
 import io
+import ffmpeg
 
 # Load environment variables - try local .env first, then fall back to Streamlit secrets
 load_dotenv()
@@ -225,28 +226,32 @@ def generate_elevenlabs_voice(text, language_code, output_directory, english_ide
         return None
 
 def mix_audio_with_video(audio_file, video_file, output_file, original_volume=0.8, voiceover_volume=1.3):
-    """Mix audio with video using FFmpeg"""
+    """Mix audio with video using ffmpeg-python"""
     try:
-        ffmpeg_command = [
-            "ffmpeg",
-            "-y",
-            "-i", str(video_file),
-            "-i", str(audio_file),
-            "-filter_complex",
-            f"[0:a]volume={original_volume}[a1];[1:a]volume={voiceover_volume}[a2];[a1][a2]amix=inputs=2:duration=first",
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-strict", "experimental",
-            str(output_file)
-        ]
+        # Get the video stream
+        video = ffmpeg.input(str(video_file))
+        # Get the audio stream
+        audio = ffmpeg.input(str(audio_file))
         
-        result = subprocess.run(ffmpeg_command, capture_output=True, text=True)
+        # Mix the audio streams
+        mixed_audio = ffmpeg.filter([
+            ffmpeg.filter(video.audio, 'volume', original_volume),
+            ffmpeg.filter(audio, 'volume', voiceover_volume)
+        ], 'amix', inputs=2, duration='first')
         
-        if result.returncode != 0:
-            st.error(f"Error mixing audio: {result.stderr}")
-            return False
-            
+        # Combine video and mixed audio
+        ffmpeg.output(
+            video.video,
+            mixed_audio,
+            str(output_file),
+            acodec='aac',
+            vcodec='copy'
+        ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+        
         return True
+    except ffmpeg.Error as e:
+        st.error(f"Error in audio mixing: {e.stderr.decode() if e.stderr else str(e)}")
+        return False
     except Exception as e:
         st.error(f"Error in audio mixing: {str(e)}")
         return False
