@@ -21,20 +21,15 @@ import ffmpeg
 # Load environment variables - try local .env first, then fall back to Streamlit secrets
 load_dotenv()
 
-# Debug: Print all available secrets
-st.write("Debug: Available secrets:", st.secrets)
-
 # Get API keys from either .env or Streamlit secrets
 def get_secret(key):
     """Get secret from environment variable or Streamlit secrets"""
     value = os.getenv(key)
     if value:
-        st.write(f"Debug: Found {key} in environment variables")
         return value
     try:
         # Try to get the secret from the nested structure
         value = st.secrets["secrets"][key]
-        st.write(f"Debug: Found {key} in Streamlit secrets")
         return value
     except KeyError:
         st.error(f"""
@@ -47,19 +42,12 @@ def get_secret(key):
         [secrets]
         {key} = "your_api_key"
         ```
-        
-        Debug Info:
-        - Available secrets: {list(st.secrets.get('secrets', {}).keys()) if hasattr(st.secrets, 'get') else 'No secrets found'}
-        - Environment variable value: {os.getenv(key)}
         """)
         st.stop()
 
 # Get API keys
 openai_api_key = get_secret("OPENAI_API_KEY")
 elevenlabs_api_key = get_secret("ELEVENLABS_API_KEY")
-
-# Debug: Print first few characters of API keys (safely)
-st.write("Debug: ElevenLabs API Key starts with:", elevenlabs_api_key[:10] + "..." if elevenlabs_api_key else "None")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -321,10 +309,10 @@ def main():
     with col2:
         if st.button("Select All"):
             st.session_state.selected_languages = list(LANGUAGES.keys())
-            st.experimental_rerun()
+            st.rerun()
         if st.button("Clear All"):
             st.session_state.selected_languages = []
-            st.experimental_rerun()
+            st.rerun()
     
     # Translation mode
     st.header("🔄 3. Translation Mode")
