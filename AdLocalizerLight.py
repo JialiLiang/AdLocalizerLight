@@ -17,6 +17,8 @@ import logging
 import zipfile
 import io
 import ffmpeg
+from datetime import datetime
+import tempfile
 
 # Load environment variables - try local .env first, then fall back to Streamlit secrets
 load_dotenv()
@@ -254,6 +256,90 @@ def create_zip_file(file_paths):
     zip_buffer.seek(0)
     return zip_buffer
 
+def extract_audio_from_video(video_path, output_audio_path):
+    """Extract audio from video using ffmpeg"""
+    try:
+        # Use ffmpeg to extract audio from video
+        (
+            ffmpeg
+            .input(str(video_path))
+            .output(str(output_audio_path), acodec='pcm_s16le', ac=1, ar='16000')
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        return True
+    except ffmpeg.Error as e:
+        st.error(f"Error extracting audio: {e.stderr.decode() if e.stderr else str(e)}")
+        return False
+    except Exception as e:
+        st.error(f"Error extracting audio: {str(e)}")
+        return False
+
+def transcribe_audio(audio_file_path):
+    """Transcribe audio using OpenAI Whisper"""
+    try:
+        with open(audio_file_path, "rb") as audio_file:
+            transcription = openai_client.audio.transcriptions.create(
+                file=audio_file,
+                model="whisper-1",
+                response_format="text",
+                prompt="This is a marketing video or advertisement. Please transcribe accurately."
+            )
+        return transcription
+    except Exception as e:
+        st.error(f"Error transcribing audio: {str(e)}")
+        return None
+
+def transcribe_video(video_file):
+    """Complete transcription workflow for video file"""
+    try:
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_extension = os.path.splitext(video_file.name)[1].lower()
+        
+        # Create temporary directory
+        temp_dir = Path("temp_transcription")
+        temp_dir.mkdir(exist_ok=True)
+        
+        # Save uploaded video file
+        temp_video_path = temp_dir / f"temp_video_{timestamp}{file_extension}"
+        with open(temp_video_path, "wb") as f:
+            f.write(video_file.getbuffer())
+        
+        logging.info(f"Video saved: {temp_video_path}")
+        
+        # Extract audio from video
+        temp_audio_path = temp_dir / f"temp_audio_{timestamp}.wav"
+        
+        if not extract_audio_from_video(temp_video_path, temp_audio_path):
+            return None
+        
+        logging.info(f"Audio extracted: {temp_audio_path}")
+        
+        # Transcribe the audio
+        transcription = transcribe_audio(temp_audio_path)
+        
+        # Clean up temporary files
+        try:
+            os.remove(temp_video_path)
+            os.remove(temp_audio_path)
+            if temp_dir.exists() and not any(temp_dir.iterdir()):
+                temp_dir.rmdir()
+        except Exception as e:
+            logging.warning(f"Error cleaning up temp files: {str(e)}")
+        
+        return transcription
+        
+    except Exception as e:
+        logging.error(f"Error in transcribe_video function: {str(e)}")
+        st.error(f"Error transcribing video: {str(e)}")
+        return None
+
+def on_language_change():
+    """Callback function to handle language selection changes"""
+    if 'language_selector' in st.session_state:
+        st.session_state.selected_languages = st.session_state.language_selector
+
 def main():
     st.title("🎥 Photoroom Adlocalizer (Light)")
     st.markdown("Made with ❤️ by Jiali")
@@ -269,6 +355,8 @@ def main():
         st.session_state.video_path = None
     if 'selected_languages' not in st.session_state:
         st.session_state.selected_languages = ["JP", "CN", "DE", "FR", "KR", "ES"]
+    if 'transcribed_text' not in st.session_state:
+        st.session_state.transcribed_text = ""
     
     # Create necessary directories
     base_dir = Path("New clean ones 2025")
@@ -279,17 +367,57 @@ def main():
     for directory in [audio_dir, video_dir, export_dir]:
         directory.mkdir(parents=True, exist_ok=True)
     
+    # Video Transcription Section
+    st.header("🎤 1. Video Transcription (Optional)")
+    st.markdown("Upload a video to automatically transcribe its audio content using AI.")
+    
+    transcription_video = st.file_uploader(
+        "Upload video for transcription", 
+        type=["mp4", "mov", "avi", "mkv"],
+        help="Upload a video file to transcribe its audio content. The transcribed text will appear in the text input below."
+    )
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🎙️ Transcribe Video"):
+            if transcription_video:
+                with st.spinner("Transcribing video... This may take a moment."):
+                    transcription = transcribe_video(transcription_video)
+                    if transcription:
+                        st.session_state.transcribed_text = transcription
+                        st.success("✅ Video transcribed successfully!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to transcribe video.")
+            else:
+                st.warning("Please upload a video file first.")
+    
+    with col2:
+        if st.button("🗑️ Clear Transcription"):
+            st.session_state.transcribed_text = ""
+            st.rerun()
+    
+    # Display transcribed text if available
+    if st.session_state.transcribed_text:
+        st.success("📝 Transcribed Text:")
+        st.text_area("Transcription Result", st.session_state.transcribed_text, height=100, disabled=True)
+    
     # Text input
-    st.header("📝 1. Enter Text to Translate")
+    st.header("📝 2. Enter Text to Translate")
+    
+    # Use transcribed text as default if available
+    default_text = st.session_state.transcribed_text if st.session_state.transcribed_text else ""
+    
     text = st.text_area(
         "Enter your text here:",
+        value=default_text,
         height=150,
         placeholder="Photoroom is the best app in the world.",
-        help="Enter the text you want to translate. The placeholder text will disappear when you start typing."
+        help="Enter the text you want to translate. You can use the transcribed text above or type your own."
     )
     
     # Language selection
-    st.header("🌍 2. Select Languages")
+    st.header("🌍 3. Select Languages")
     
     # Language code info
     with st.expander("ℹ️ Language Codes Reference"):
@@ -300,22 +428,67 @@ def main():
     
     col1, col2 = st.columns([3, 1])
     with col1:
+        # Use key parameter and callback for proper state management
         selected_languages = st.multiselect(
             "Choose languages to translate to:",
             options=list(LANGUAGES.keys()),
-            default=st.session_state.selected_languages
+            default=st.session_state.selected_languages,
+            key="language_selector",
+            help="Select the languages you want to translate to. Use the buttons on the right for quick selection.",
+            on_change=on_language_change
         )
-        st.session_state.selected_languages = selected_languages
+    
     with col2:
-        if st.button("Select All"):
+        if st.button("Select All", key="select_all_btn", help="Select all available languages"):
             st.session_state.selected_languages = list(LANGUAGES.keys())
+            # Force widget to update by clearing its state
+            if 'language_selector' in st.session_state:
+                del st.session_state.language_selector
             st.rerun()
-        if st.button("Clear All"):
+        if st.button("Clear All", key="clear_all_btn", help="Clear all selected languages"):
             st.session_state.selected_languages = []
+            # Force widget to update by clearing its state
+            if 'language_selector' in st.session_state:
+                del st.session_state.language_selector
             st.rerun()
     
+    # Display selected languages count and quick actions
+    if st.session_state.selected_languages:
+        lang_names = [LANGUAGES[lang] for lang in st.session_state.selected_languages]
+        st.info(f"📊 Selected {len(st.session_state.selected_languages)} language(s): {', '.join(lang_names)}")
+        
+        # Quick preset buttons for common language sets
+        st.markdown("**Quick Presets:**")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("🌏 Asian", key="asian_preset", help="Select Asian languages"):
+                st.session_state.selected_languages = ["JP", "CN", "KR", "ID", "TH", "VN", "MY"]
+                if 'language_selector' in st.session_state:
+                    del st.session_state.language_selector
+                st.rerun()
+        with col2:
+            if st.button("🌍 European", key="european_preset", help="Select European languages"):
+                st.session_state.selected_languages = ["DE", "FR", "IT", "ES", "PL", "TR"]
+                if 'language_selector' in st.session_state:
+                    del st.session_state.language_selector
+                st.rerun()
+        with col3:
+            if st.button("🌎 Americas", key="americas_preset", help="Select Americas languages"):
+                st.session_state.selected_languages = ["ES", "BR", "FR"]
+                if 'language_selector' in st.session_state:
+                    del st.session_state.language_selector
+                st.rerun()
+        with col4:
+            if st.button("🔢 Top 5", key="top5_preset", help="Select top 5 most common languages"):
+                st.session_state.selected_languages = ["JP", "KR", "ES", "BR", "FR"]
+                if 'language_selector' in st.session_state:
+                    del st.session_state.language_selector
+                st.rerun()
+    else:
+        st.warning("⚠️ No languages selected. Please select at least one language to proceed.")
+    
     # Translation mode
-    st.header("🔄 3. Translation Mode")
+    st.header("🔄 4. Translation Mode")
     translation_mode = st.radio(
         "Select translation mode:",
         ["faithful", "creative"],
@@ -324,7 +497,7 @@ def main():
     )
     
     # Voice selection
-    st.header("🎙️ 4. Voice Settings")
+    st.header("🎙️ 5. Voice Settings")
     voice_options = {f"{v['name']}": v['id'] for v in VOICES.values()}
     selected_voice = st.selectbox(
         "Choose a voice:",
@@ -384,7 +557,7 @@ def main():
                     st.audio(audio_file)
     
     # Volume settings
-    st.header("🎚️ 5. Audio Settings")
+    st.header("🎚️ 6. Audio Settings")
     col1, col2 = st.columns(2)
     with col1:
         original_volume = st.slider("Original Audio Volume", 0.0, 2.0, 0.8, 0.1)
@@ -392,7 +565,7 @@ def main():
         voiceover_volume = st.slider("Voiceover Volume", 0.0, 2.0, 1.3, 0.1)
     
     # Video upload
-    st.header("🎬 6. Upload Video")
+    st.header("🎬 7. Upload Video")
     st.info("Please upload a video without voiceover (SFX version) - containing only music and sound effects.")
     video_file = st.file_uploader("Upload your SFX video file", type=["mp4", "mov"])
     
