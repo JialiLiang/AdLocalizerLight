@@ -1,0 +1,84 @@
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Generated files and output directories
+New clean ones 2025/
+audio/
+video/
+export/
+output/
+temp/
+tmp/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Audio and video files (if generated)
+*.mp3
+*.mp4
+*.wav
+*.avi
+*.mov
+*.mkv
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Streamlit cache
+.streamlit/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/ 
