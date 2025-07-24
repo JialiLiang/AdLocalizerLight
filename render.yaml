@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: photoroom-adlocalizer
+    env: python
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONWARNINGS
+        value: ignore
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false 

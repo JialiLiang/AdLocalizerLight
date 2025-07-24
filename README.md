@@ -14,39 +14,33 @@ A modern web application for translating and localizing video content with AI-po
 - **Batch Processing**: Generate multiple language versions simultaneously
 - **Integrated Workflow**: Seamless integration with [Video Format Converter](https://photoroomvideoformatconverter.onrender.com/)
 
-## 🚀 Quick Deploy on Railway
+## 🚀 Quick Deploy on Render
 
 ### Option 1: Deploy from GitHub (Recommended)
 
 1. **Fork this repository** to your GitHub account
-2. **Connect to Railway**:
-   - Go to [Railway.app](https://railway.app)
-   - Click "New Project"
-   - Select "Deploy from GitHub repo"
-   - Choose your forked repository
-3. **Set Environment Variables**:
+2. **Connect to Render**:
+   - Go to [Render.com](https://render.com)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub account
+   - Select your repository
+3. **Configure the service**:
+   - **Name**: `photoroom-adlocalizer`
+   - **Environment**: `Python`
+   - **Build Command**: `pip install --no-cache-dir -r requirements.txt`
+   - **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT`
+4. **Set Environment Variables**:
    - Add `OPENAI_API_KEY` with your OpenAI API key
    - Add `ELEVENLABS_API_KEY` with your ElevenLabs API key
    - Add `SECRET_KEY` with a random secret string
-4. **Deploy**: Railway will automatically build and deploy your app
+5. **Deploy**: Render will automatically build and deploy your app
 
-### Option 2: Deploy from Local Files
+### Option 2: Use render.yaml (Automatic)
 
-1. **Install Railway CLI**:
-   ```bash
-   npm install -g @railway/cli
-   ```
-
-2. **Login to Railway**:
-   ```bash
-   railway login
-   ```
-
-3. **Initialize and Deploy**:
-   ```bash
-   railway init
-   railway up
-   ```
+The repository includes a `render.yaml` file that automatically configures the deployment. Simply:
+1. Connect your GitHub repo to Render
+2. Render will detect the `render.yaml` and configure everything automatically
+3. Just add your environment variables and deploy!
 
 ## 🔧 Local Development
 
