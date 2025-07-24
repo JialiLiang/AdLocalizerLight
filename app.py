@@ -22,6 +22,7 @@ import tempfile
 import uuid
 import json
 from tools_config import get_active_tools
+import torch
 
 # Load environment variables
 load_dotenv()
@@ -106,6 +107,7 @@ Important: The translation should read fluidly in {target_language}, feel cultur
 6. Use the exact tone, rhythm, and speech patterns that are distinctly characteristic of the culture.
 7. Keep brand names in English but adapt surrounding language to sound natural.
 8. Return only the translated text as a single paragraph with no explanations.
+9. Keep the translation length SIMILAR to the original text
 
 Important: The translation should sound completely authentic to native speakers, as if it was originally conceived in their language and culture - NOT like a translation at all. Use expressions only locals would know and appreciate."""
     
@@ -195,11 +197,116 @@ def generate_elevenlabs_voice(text, language_code, output_directory, english_ide
         logging.error(f"Error generating voice: {str(e)}")
         return None
 
-def mix_audio_with_video(audio_file, video_file, output_file, original_volume=0.8, voiceover_volume=1.3):
+def separate_vocals_demucs(audio_file, output_dir):
+    """Separate vocals from audio using Demucs"""
+    try:
+        # Create output directory for stems
+        stems_dir = Path(output_dir) / "stems"
+        stems_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Run demucs separation with better error handling
+        cmd = [
+            'python3', '-m', 'demucs.separate',
+            '--two-stems', 'vocals',  # Only separate vocals vs instrumental
+            '--out', str(stems_dir),
+            '--mp3',  # Use MP3 format which is more reliable
+            '--mp3-bitrate', '320',  # High quality
+            str(audio_file)
+        ]
+        
+        logging.info(f"Running Demucs command: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)  # 5 minute timeout
+        
+        if result.returncode != 0:
+            logging.error(f"Demucs command failed with return code {result.returncode}")
+            logging.error(f"Demucs stderr: {result.stderr}")
+            logging.error(f"Demucs stdout: {result.stdout}")
+            return None
+        
+        # Find the generated instrumental file
+        audio_name = Path(audio_file).stem
+        
+        # Try multiple possible paths
+        possible_paths = [
+            stems_dir / "htdemucs" / audio_name / "no_vocals.mp3",
+            stems_dir / "htdemucs" / audio_name / "no_vocals.wav", 
+            stems_dir / "mdx_extra" / audio_name / "no_vocals.mp3",
+            stems_dir / "mdx_extra" / audio_name / "no_vocals.wav"
+        ]
+        
+        for instrumental_file in possible_paths:
+            if instrumental_file.exists():
+                logging.info(f"Found instrumental file: {instrumental_file}")
+                return str(instrumental_file)
+        
+        # If no standard file found, list what was actually created
+        logging.error(f"Instrumental file not found. Contents of stems directory:")
+        for root, dirs, files in os.walk(stems_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                logging.error(f"  Found: {file_path}")
+        
+        return None
+            
+    except subprocess.TimeoutExpired:
+        logging.error("Demucs process timed out after 5 minutes")
+        return None
+    except Exception as e:
+        logging.error(f"Error in vocal separation: {str(e)}")
+        return None
+
+def remove_vocals_from_video(video_path, output_directory):
+    """Complete workflow to remove vocals from video and return instrumental version"""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Extract audio from video
+        temp_audio_path = Path(output_directory) / f"temp_audio_{timestamp}.wav"
+        if not extract_audio_from_video(video_path, temp_audio_path):
+            return None
+        
+        # Separate vocals
+        instrumental_path = separate_vocals_demucs(temp_audio_path, output_directory)
+        
+        if not instrumental_path:
+            return None
+        
+        # Create video with instrumental audio
+        instrumental_video_path = Path(output_directory) / f"instrumental_video_{timestamp}.mp4"
+        
+        video = ffmpeg.input(str(video_path))
+        audio = ffmpeg.input(str(instrumental_path))
+        
+        ffmpeg.output(
+            video.video,
+            audio,
+            str(instrumental_video_path),
+            acodec='aac',
+            vcodec='copy'
+        ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+        
+        # Clean up temporary audio
+        try:
+            os.remove(temp_audio_path)
+        except:
+            pass
+        
+        return str(instrumental_video_path)
+        
+    except Exception as e:
+        logging.error(f"Error removing vocals from video: {str(e)}")
+        return None
+
+def mix_audio_with_video(audio_file, video_file, output_file, original_volume=0.8, voiceover_volume=1.3, use_instrumental=False):
     """Mix audio with video using ffmpeg-python"""
     try:
         video = ffmpeg.input(str(video_file))
         audio = ffmpeg.input(str(audio_file))
+        
+        # If using instrumental version, we don't need to lower the original volume as much
+        if use_instrumental:
+            original_volume = min(original_volume * 1.5, 1.0)  # Boost instrumental audio a bit
         
         mixed_audio = ffmpeg.filter([
             ffmpeg.filter(video.audio, 'volume', original_volume),
@@ -286,8 +393,9 @@ def transcribe_video(video_file_path):
 
 @app.route('/')
 def index():
+    from tools_config import TOOLS_CONFIG
     tools = get_active_tools()
-    return render_template('index.html', languages=LANGUAGES, voices=VOICES, tools=tools)
+    return render_template('index.html', languages=LANGUAGES, voices=VOICES, tools=tools, tools_config=TOOLS_CONFIG)
 
 @app.route('/api/translate', methods=['POST'])
 def translate():
@@ -375,18 +483,72 @@ def upload_video():
         logging.error(f"Video upload error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/remove-vocals', methods=['POST'])
+def remove_vocals():
+    try:
+        # First check if we have a video from the regular upload
+        video_path = session.get('video_path')
+        
+        # If no regular video, check if we have a transcription video
+        if not video_path:
+            transcription_video_path = session.get('transcription_video_path')
+            if transcription_video_path and os.path.exists(transcription_video_path):
+                video_path = transcription_video_path
+                # Also set it as the main video path for mixing later
+                session['video_path'] = video_path
+                logging.info("Using transcription video for vocal removal")
+        
+        if not video_path or not os.path.exists(video_path):
+            return jsonify({'error': 'No video uploaded. Please upload a video first.'}), 400
+        
+        session_id = session.get('session_id', str(uuid.uuid4()))
+        session['session_id'] = session_id
+        
+        base_dir = Path(f"temp_files/{session_id}")
+        vocal_removal_dir = base_dir / "vocal_removal"
+        vocal_removal_dir.mkdir(parents=True, exist_ok=True)
+        
+        logging.info(f"Processing vocal removal for: {video_path}")
+        
+        # Remove vocals and create instrumental version
+        instrumental_video_path = remove_vocals_from_video(video_path, str(vocal_removal_dir))
+        
+        if instrumental_video_path:
+            session['instrumental_video_path'] = instrumental_video_path
+            return jsonify({
+                'success': True, 
+                'instrumental_video': instrumental_video_path,
+                'message': 'Vocals removed successfully'
+            })
+        else:
+            return jsonify({'error': 'Failed to remove vocals'}), 500
+            
+    except Exception as e:
+        logging.error(f"Vocal removal error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/mix-audio', methods=['POST'])
 def mix_audio():
     try:
         data = request.get_json()
         original_volume = data.get('original_volume', 0.8)
         voiceover_volume = data.get('voiceover_volume', 1.3)
+        use_vocal_removal = data.get('use_vocal_removal', False)
         
         audio_files = session.get('audio_files', {})
         video_path = session.get('video_path')
         
         if not audio_files or not video_path:
             return jsonify({'error': 'Audio files and video path are required'}), 400
+        
+        # Use instrumental version if available and requested
+        if use_vocal_removal:
+            instrumental_video_path = session.get('instrumental_video_path')
+            if instrumental_video_path and os.path.exists(instrumental_video_path):
+                video_path = instrumental_video_path
+                logging.info("Using instrumental version for mixing")
+            else:
+                logging.warning("Instrumental version requested but not available, using original")
         
         # Create export directory
         session_id = session.get('session_id')
@@ -398,11 +560,13 @@ def mix_audio():
         video_filename = Path(video_path).name
         
         for lang_code, audio_file in audio_files.items():
-            output_file = export_dir / f"{video_filename.split('.')[0]}_{lang_code}.mp4"
-            if mix_audio_with_video(audio_file, video_path, str(output_file), original_volume, voiceover_volume):
+            suffix = "_instrumental" if use_vocal_removal else ""
+            output_file = export_dir / f"{video_filename.split('.')[0]}_{lang_code}{suffix}.mp4"
+            if mix_audio_with_video(audio_file, video_path, str(output_file), original_volume, voiceover_volume, use_vocal_removal):
                 mixed_videos[lang_code] = str(output_file)
         
         session['mixed_videos'] = mixed_videos
+        session['used_vocal_removal'] = use_vocal_removal
         return jsonify({'mixed_videos': mixed_videos})
     except Exception as e:
         logging.error(f"Audio mixing error: {str(e)}")
@@ -418,25 +582,29 @@ def transcribe():
         if video_file.filename == '':
             return jsonify({'error': 'No video file selected'}), 400
         
-        # Save video temporarily
-        temp_dir = Path("temp_transcription")
-        temp_dir.mkdir(exist_ok=True)
+        # Create session-specific directories
+        session_id = session.get('session_id', str(uuid.uuid4()))
+        session['session_id'] = session_id
+        
+        base_dir = Path(f"temp_files/{session_id}")
+        transcription_dir = base_dir / "transcription"
+        transcription_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_video_path = temp_dir / f"temp_video_{timestamp}_{video_file.filename}"
+        temp_video_path = transcription_dir / f"transcription_video_{timestamp}_{video_file.filename}"
         video_file.save(str(temp_video_path))
+        
+        # Store the transcription video path for later use
+        session['transcription_video_path'] = str(temp_video_path)
         
         # Transcribe
         transcription = transcribe_video(temp_video_path)
         
-        # Clean up
-        try:
-            os.remove(temp_video_path)
-        except:
-            pass
-        
         if transcription:
-            return jsonify({'transcription': transcription})
+            return jsonify({
+                'transcription': transcription,
+                'video_available_for_vocal_removal': True
+            })
         else:
             return jsonify({'error': 'Failed to transcribe video'}), 500
     except Exception as e:
@@ -534,5 +702,5 @@ if __name__ == '__main__':
     Path("temp_files").mkdir(exist_ok=True)
     Path("temp_transcription").mkdir(exist_ok=True)
     
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))  # Changed default from 5000 to 5001
     app.run(host='0.0.0.0', port=port, debug=False) 

@@ -3,7 +3,7 @@
 
 TOOLS_CONFIG = {
     "brand": {
-        "name": "Photoroom Tools",
+        "name": "Photoroom UA Video Tools",
         "icon": "fas fa-photo-video",
         "url": "#"
     },

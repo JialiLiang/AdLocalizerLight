@@ -2,10 +2,16 @@ services:
   - type: web
     name: photoroom-adlocalizer
     env: python
-    buildCommand: pip install --no-cache-dir -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
-    plan: starter
+    buildCommand: |
+      pip install --no-cache-dir -r requirements.txt &&
+      python -c "import demucs; print('Demucs installed successfully')"
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1
+    plan: standard  # Upgrade from starter to support larger models
     healthCheckPath: /
+    disk:
+      name: demucs-models
+      mountPath: /opt/render/.cache
+      sizeGB: 5  # Space for model storage
     envVars:
       - key: PORT
         value: 10000
@@ -13,6 +19,8 @@ services:
         value: production
       - key: PYTHONWARNINGS
         value: ignore
+      - key: TORCH_HOME
+        value: /opt/render/.cache/torch
       - key: OPENAI_API_KEY
         sync: false
       - key: ELEVENLABS_API_KEY
