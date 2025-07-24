@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎥 Photoroom Adlocalizer (Light)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e9ecef;
+        }
+        .section h3 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 500;
+        }
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .language-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .language-card:hover {
+            border-color: #667eea;
+            background: #e3f2fd;
+        }
+        .language-card.selected {
+            border-color: #667eea;
+            background: #e3f2fd;
+        }
+        .translation-result {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+        }
+        .audio-player {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+        }
+        .file-upload {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+        .file-upload.dragover {
+            border-color: #667eea;
+            background: #e3f2fd;
+        }
+        .preset-btn {
+            margin: 5px;
+            border-radius: 20px;
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Navigation Bar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary rounded mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-photo-video"></i> Photoroom Tools
+                </a>
+                
+                <div class="navbar-nav ms-auto">
+                    {% for tool in tools %}
+                        {% if tool.name == "AdLocalizer" %}
+                            <a class="nav-link active" href="{{ tool.url }}" aria-current="page">
+                                <i class="{{ tool.icon }}"></i> {{ tool.name }}
+                            </a>
+                        {% else %}
+                            <a class="nav-link" href="{{ tool.url }}" {% if tool.url.startswith('http') %}target="_blank"{% endif %}>
+                                <i class="{{ tool.icon }}"></i> {{ tool.name }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </nav>
+
+        <div class="header">
+            <h1><i class="fas fa-video"></i> Photoroom Adlocalizer (Light)</h1>
+            <p class="text-muted">Made with ❤️ by Jiali</p>
+        </div>
+
+        <!-- Video Transcription Section -->
+        <div class="section">
+            <h3><i class="fas fa-microphone"></i> 1. Video Transcription (Optional)</h3>
+            <p class="text-muted">Upload a video to automatically transcribe its audio content using AI.</p>
+            
+            <div class="file-upload" id="transcriptionUpload">
+                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                <p class="mb-2">Drop video file here or click to browse</p>
+                <p class="text-muted small">Supported formats: MP4, MOV, AVI, MKV</p>
+                <input type="file" id="transcriptionFile" accept="video/*" style="display: none;">
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <button class="btn btn-primary w-100" onclick="transcribeVideo()">
+                        <i class="fas fa-microphone"></i> Transcribe Video
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-secondary w-100" onclick="clearTranscription()">
+                        <i class="fas fa-trash"></i> Clear Transcription
+                    </button>
+                </div>
+            </div>
+            
+            <div id="transcriptionResult" class="mt-3" style="display: none;">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check"></i> Transcribed Text:</h6>
+                    <div id="transcriptionText"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text Input Section -->
+        <div class="section">
+            <h3><i class="fas fa-edit"></i> 2. Enter Text to Translate</h3>
+            <textarea class="form-control" id="textInput" rows="4" 
+                      placeholder="Photoroom is the best app in the world."></textarea>
+        </div>
+
+        <!-- Language Selection Section -->
+        <div class="section">
+            <h3><i class="fas fa-globe"></i> 3. Select Languages</h3>
+            
+            <div class="mb-3">
+                <button class="btn btn-outline-primary preset-btn" onclick="selectPreset('top5')">
+                    🔢 Top 5
+                </button>
+                <button class="btn btn-outline-primary preset-btn" onclick="selectPreset('asian')">
+                    🌏 Asian
+                </button>
+                <button class="btn btn-outline-primary preset-btn" onclick="selectPreset('european')">
+                    🌍 European
+                </button>
+                <button class="btn btn-outline-primary preset-btn" onclick="selectPreset('americas')">
+                    🌎 Americas
+                </button>
+                <button class="btn btn-outline-secondary preset-btn" onclick="selectAll()">
+                    Select All
+                </button>
+                <button class="btn btn-outline-secondary preset-btn" onclick="clearAll()">
+                    Clear All
+                </button>
+            </div>
+            
+            <div id="languageGrid" class="row">
+                {% for code, name in languages.items() %}
+                <div class="col-md-4 col-lg-3">
+                    <div class="language-card" data-lang="{{ code }}" onclick="toggleLanguage('{{ code }}')">
+                        <strong>{{ name }}</strong> ({{ code }})
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div id="selectedCount" class="mt-3 text-muted"></div>
+        </div>
+
+        <!-- Translation Mode Section -->
+        <div class="section">
+            <h3><i class="fas fa-exchange-alt"></i> 4. Translation Mode</h3>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="translationMode" id="faithful" value="faithful" checked>
+                <label class="form-check-label" for="faithful">
+                    <i class="fas fa-balance-scale"></i> Faithful (More literal)
+                </label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="translationMode" id="creative" value="creative">
+                <label class="form-check-label" for="creative">
+                    <i class="fas fa-magic"></i> Creative (More localized)
+                </label>
+            </div>
+            
+            <div class="mt-3">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> Translation Modes:</h6>
+                    <ul class="mb-0">
+                        <li><strong>Faithful:</strong> Word-by-word translation - keeps original English context</li>
+                        <li><strong>Creative:</strong> Localized with slang and cultural expressions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="section text-center">
+            <button class="btn btn-primary btn-lg" onclick="translateText()">
+                <i class="fas fa-language"></i> Translate Text
+            </button>
+        </div>
+
+        <!-- Voice Settings Section -->
+        <div class="section">
+            <h3><i class="fas fa-microphone"></i> 5. Voice Settings</h3>
+            <select class="form-select" id="voiceSelect">
+                {% for id, voice in voices.items() %}
+                <option value="{{ voice.id }}">{{ voice.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Translations Results -->
+        <div id="translationsSection" class="section" style="display: none;">
+            <h3><i class="fas fa-list"></i> Translations</h3>
+            <div id="translationsGrid"></div>
+            
+            <div class="text-center mt-3">
+                <button class="btn btn-success btn-lg" onclick="generateVoiceovers()">
+                    <i class="fas fa-microphone"></i> Generate Voiceovers
+                </button>
+            </div>
+        </div>
+
+        <!-- Audio Results -->
+        <div id="audioSection" class="section" style="display: none;">
+            <h3><i class="fas fa-volume-up"></i> Generated Voiceovers</h3>
+            <div id="audioGrid"></div>
+        </div>
+
+        <!-- Audio Settings -->
+        <div class="section">
+            <h3><i class="fas fa-sliders-h"></i> 6. Audio Settings</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="originalVolume" class="form-label">Original Audio Volume</label>
+                    <input type="range" class="form-range" id="originalVolume" min="0" max="2" step="0.1" value="0.8">
+                    <div class="text-center" id="originalVolumeValue">0.8</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="voiceoverVolume" class="form-label">Voiceover Volume</label>
+                    <input type="range" class="form-range" id="voiceoverVolume" min="0" max="2" step="0.1" value="1.3">
+                    <div class="text-center" id="voiceoverVolumeValue">1.3</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Upload Section -->
+        <div class="section">
+            <h3><i class="fas fa-film"></i> 7. Upload Video</h3>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Please upload a video without voiceover (SFX version) - containing only music and sound effects.
+            </div>
+            
+            <div class="file-upload" id="videoUpload">
+                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                <p class="mb-2">Drop video file here or click to browse</p>
+                <p class="text-muted small">Supported formats: MP4, MOV</p>
+                <input type="file" id="videoFile" accept="video/*" style="display: none;">
+            </div>
+            
+            <div id="videoInfo" class="mt-3" style="display: none;">
+                <div class="alert alert-success">
+                    <i class="fas fa-check"></i> Video uploaded successfully!
+                </div>
+            </div>
+        </div>
+
+        <!-- Mix Audio Button -->
+        <div class="section text-center">
+            <button class="btn btn-primary btn-lg" onclick="mixAudio()">
+                <i class="fas fa-music"></i> Mix Audio with Video
+            </button>
+        </div>
+
+        <!-- Final Videos -->
+        <div id="videosSection" class="section" style="display: none;">
+            <h3><i class="fas fa-video"></i> Final Videos</h3>
+            
+            <div class="text-center mb-3">
+                <button class="btn btn-success btn-lg" onclick="downloadAll()">
+                    <i class="fas fa-download"></i> Download All Videos (ZIP)
+                </button>
+            </div>
+            
+            <div id="videosGrid"></div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3" id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedLanguages = [];
+        let translations = {};
+        let audioFiles = {};
+        let mixedVideos = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupFileUploads();
+            setupVolumeSliders();
+            updateSelectedCount();
+        });
+
+        // File upload setup
+        function setupFileUploads() {
+            // Transcription upload
+            const transcriptionUpload = document.getElementById('transcriptionUpload');
+            const transcriptionFile = document.getElementById('transcriptionFile');
+            
+            transcriptionUpload.addEventListener('click', () => transcriptionFile.click());
+            transcriptionUpload.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                transcriptionUpload.classList.add('dragover');
+            });
+            transcriptionUpload.addEventListener('dragleave', () => {
+                transcriptionUpload.classList.remove('dragover');
+            });
+            transcriptionUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                transcriptionUpload.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    transcriptionFile.files = files;
+                }
+            });
+            transcriptionFile.addEventListener('change', () => {
+                if (transcriptionFile.files.length > 0) {
+                    // Update display without removing the file input
+                    const icon = transcriptionUpload.querySelector('i');
+                    const text = transcriptionUpload.querySelector('p');
+                    const smallText = transcriptionUpload.querySelector('.small');
+                    
+                    if (icon) icon.className = 'fas fa-file-video fa-3x text-success mb-3';
+                    if (text) text.textContent = transcriptionFile.files[0].name;
+                    if (smallText) smallText.textContent = 'Click "Transcribe Video" to process';
+                }
+            });
+
+            // Video upload
+            const videoUpload = document.getElementById('videoUpload');
+            const videoFile = document.getElementById('videoFile');
+            
+            videoUpload.addEventListener('click', () => videoFile.click());
+            videoUpload.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                videoUpload.classList.add('dragover');
+            });
+            videoUpload.addEventListener('dragleave', () => {
+                videoUpload.classList.remove('dragover');
+            });
+            videoUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                videoUpload.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    videoFile.files = files;
+                }
+            });
+            videoFile.addEventListener('change', () => {
+                if (videoFile.files.length > 0) {
+                    // Update display without removing the file input
+                    const icon = videoUpload.querySelector('i');
+                    const text = videoUpload.querySelector('p');
+                    const smallText = videoUpload.querySelector('.small');
+                    
+                    if (icon) icon.className = 'fas fa-file-video fa-3x text-success mb-3';
+                    if (text) text.textContent = videoFile.files[0].name;
+                    if (smallText) smallText.textContent = 'Video ready for mixing';
+                    document.getElementById('videoInfo').style.display = 'block';
+                }
+            });
+        }
+
+        // Volume sliders
+        function setupVolumeSliders() {
+            const originalVolume = document.getElementById('originalVolume');
+            const voiceoverVolume = document.getElementById('voiceoverVolume');
+            
+            originalVolume.addEventListener('input', (e) => {
+                document.getElementById('originalVolumeValue').textContent = e.target.value;
+            });
+            
+            voiceoverVolume.addEventListener('input', (e) => {
+                document.getElementById('voiceoverVolumeValue').textContent = e.target.value;
+            });
+        }
+
+        // Language selection
+        function toggleLanguage(langCode) {
+            const card = document.querySelector(`[data-lang="${langCode}"]`);
+            const index = selectedLanguages.indexOf(langCode);
+            
+            if (index > -1) {
+                selectedLanguages.splice(index, 1);
+                card.classList.remove('selected');
+            } else {
+                selectedLanguages.push(langCode);
+                card.classList.add('selected');
+            }
+            
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedLanguages.length;
+            document.getElementById('selectedCount').textContent = 
+                `Selected ${count} language(s): ${selectedLanguages.map(lang => lang).join(', ')}`;
+        }
+
+        function selectPreset(preset) {
+            selectedLanguages = [];
+            document.querySelectorAll('.language-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            const presets = {
+                'asian': ['JP', 'CN', 'KR', 'ID', 'TH', 'VN', 'MY'],
+                'european': ['DE', 'FR', 'IT', 'ES', 'PL', 'TR'],
+                'americas': ['ES', 'BR', 'FR'],
+                'top5': ['BR', 'ES', 'KR', 'JP', 'FR']
+            };
+            
+            selectedLanguages = presets[preset] || [];
+            selectedLanguages.forEach(lang => {
+                const card = document.querySelector(`[data-lang="${lang}"]`);
+                if (card) card.classList.add('selected');
+            });
+            
+            updateSelectedCount();
+        }
+
+        function selectAll() {
+            selectedLanguages = [];
+            document.querySelectorAll('.language-card').forEach(card => {
+                card.classList.add('selected');
+                selectedLanguages.push(card.dataset.lang);
+            });
+            updateSelectedCount();
+        }
+
+        function clearAll() {
+            selectedLanguages = [];
+            document.querySelectorAll('.language-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            updateSelectedCount();
+        }
+
+        // Transcription
+        async function transcribeVideo() {
+            const fileInput = document.getElementById('transcriptionFile');
+            
+            if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                alert('Please select a video file first.');
+                return;
+            }
+
+            // Show progress indicator
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Transcribing...';
+            button.disabled = true;
+            
+            showLoading('Transcribing video... This may take a moment.');
+            
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.transcription) {
+                    document.getElementById('transcriptionText').textContent = result.transcription;
+                    document.getElementById('transcriptionResult').style.display = 'block';
+                    document.getElementById('textInput').value = result.transcription;
+                } else {
+                    alert('Failed to transcribe video: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error transcribing video: ' + error.message);
+            } finally {
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function clearTranscription() {
+            document.getElementById('transcriptionText').textContent = '';
+            document.getElementById('transcriptionResult').style.display = 'none';
+            document.getElementById('textInput').value = '';
+            
+            // Clear the file input
+            const fileInput = document.getElementById('transcriptionFile');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
+            // Reset upload area display without recreating the file input
+            const uploadArea = document.getElementById('transcriptionUpload');
+            const icon = uploadArea.querySelector('i');
+            const text = uploadArea.querySelector('p');
+            const smallText = uploadArea.querySelector('.small');
+            
+            if (icon) icon.className = 'fas fa-cloud-upload-alt fa-3x text-muted mb-3';
+            if (text) text.textContent = 'Drop video file here or click to browse';
+            if (smallText) smallText.textContent = 'Supported formats: MP4, MOV, AVI, MKV';
+        }
+
+        // Translation
+        async function translateText() {
+            const text = document.getElementById('textInput').value.trim();
+            const translationMode = document.querySelector('input[name="translationMode"]:checked').value;
+            
+            if (!text) {
+                alert('Please enter text to translate.');
+                return;
+            }
+            
+            if (selectedLanguages.length === 0) {
+                alert('Please select at least one language.');
+                return;
+            }
+            
+            // Show progress indicator
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+            button.disabled = true;
+            
+            showLoading('Translating text...');
+            
+            try {
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        languages: selectedLanguages,
+                        translation_mode: translationMode
+                    })
+                });
+                
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.translations) {
+                    translations = result.translations;
+                    displayTranslations();
+                } else {
+                    alert('Translation failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error translating text: ' + error.message);
+            } finally {
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function displayTranslations() {
+            const grid = document.getElementById('translationsGrid');
+            grid.innerHTML = '';
+            
+            Object.entries(translations).forEach(([langCode, translation]) => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-3';
+                col.innerHTML = `
+                    <div class="translation-result">
+                        <h6><strong>${getLanguageName(langCode)} (${langCode})</strong></h6>
+                        <p class="mb-0">${translation}</p>
+                    </div>
+                `;
+                grid.appendChild(col);
+            });
+            
+            document.getElementById('translationsSection').style.display = 'block';
+        }
+
+        // Voice generation
+        async function generateVoiceovers() {
+            if (Object.keys(translations).length === 0) {
+                alert('Please translate text first.');
+                return;
+            }
+            
+            // Show progress indicator
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            button.disabled = true;
+            
+            showLoading('Generating voiceovers...');
+            
+            try {
+                const voiceId = document.getElementById('voiceSelect').value;
+                const response = await fetch('/api/generate-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        translations: translations,
+                        voice_id: voiceId
+                    })
+                });
+                
+                const result = await response.json();
+                hideLoading();
+                
+                if (result.audio_files) {
+                    audioFiles = result.audio_files;
+                    displayAudioFiles();
+                } else {
+                    alert('Voice generation failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error generating voiceovers: ' + error.message);
+            } finally {
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function displayAudioFiles() {
+            const grid = document.getElementById('audioGrid');
+            grid.innerHTML = '';
+            
+            Object.entries(audioFiles).forEach(([langCode, audioFile]) => {
+                const audioFileName = audioFile.split('/').pop();
+                const audioUrl = `/audio/${audioFileName}`;
+                
+                console.log(`Audio file: ${audioFile} -> URL: ${audioUrl}`);
+                
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-3';
+                col.innerHTML = `
+                    <div class="translation-result">
+                        <h6><strong>${getLanguageName(langCode)} (${langCode})</strong></h6>
+                        <audio controls class="audio-player" onerror="console.error('Audio failed to load:', this.src)">
+                            <source src="${audioUrl}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div class="mt-2">
+                            <small class="text-muted">File: ${audioFileName}</small>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(col);
+            });
+            
+            document.getElementById('audioSection').style.display = 'block';
+        }
+
+        // Video mixing
+        async function mixAudio() {
+            const videoFile = document.getElementById('videoFile');
+            if (!videoFile || !videoFile.files || !videoFile.files.length) {
+                alert('Please upload a video file first.');
+                return;
+            }
+            
+            if (Object.keys(audioFiles).length === 0) {
+                alert('Please generate voiceovers first.');
+                return;
+            }
+            
+            // Show progress indicator
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mixing...';
+            button.disabled = true;
+            
+            showLoading('Mixing audio with video...');
+            
+            // Upload video first
+            const formData = new FormData();
+            formData.append('video', videoFile.files[0]);
+            
+            try {
+                const uploadResponse = await fetch('/api/upload-video', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const uploadResult = await uploadResponse.json();
+                if (!uploadResult.success) {
+                    throw new Error(uploadResult.error);
+                }
+                
+                // Mix audio
+                const originalVolume = document.getElementById('originalVolume').value;
+                const voiceoverVolume = document.getElementById('voiceoverVolume').value;
+                
+                const mixResponse = await fetch('/api/mix-audio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        original_volume: parseFloat(originalVolume),
+                        voiceover_volume: parseFloat(voiceoverVolume)
+                    })
+                });
+                
+                const mixResult = await mixResponse.json();
+                hideLoading();
+                
+                if (mixResult.mixed_videos) {
+                    mixedVideos = mixResult.mixed_videos;
+                    displayVideos();
+                } else {
+                    alert('Audio mixing failed: ' + (mixResult.error || 'Unknown error'));
+                }
+            } catch (error) {
+                hideLoading();
+                alert('Error mixing audio: ' + error.message);
+            } finally {
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function displayVideos() {
+            const grid = document.getElementById('videosGrid');
+            grid.innerHTML = '';
+            
+            Object.entries(mixedVideos).forEach(([langCode, videoPath]) => {
+                const videoFileName = videoPath.split('/').pop();
+                const videoUrl = `/video/${videoFileName}`;
+                
+                console.log(`Video file: ${videoPath} -> URL: ${videoUrl}`);
+                
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-3';
+                col.innerHTML = `
+                    <div class="translation-result">
+                        <h6><strong>${getLanguageName(langCode)} (${langCode})</strong></h6>
+                        <video controls class="w-100" onerror="console.error('Video failed to load:', this.src)">
+                            <source src="${videoUrl}" type="video/mp4">
+                            Your browser does not support the video element.
+                        </video>
+                        <div class="mt-2">
+                            <a href="/download/${videoFileName}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                            <small class="text-muted d-block mt-1">File: ${videoFileName}</small>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(col);
+            });
+            
+            document.getElementById('videosSection').style.display = 'block';
+        }
+
+        // Download functions
+        async function downloadAll() {
+            try {
+                window.location.href = '/api/download-all';
+            } catch (error) {
+                alert('Error downloading files: ' + error.message);
+            }
+        }
+
+        // Utility functions
+        function getLanguageName(code) {
+            const languages = {{ languages | tojson }};
+            return languages[code] || code;
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
